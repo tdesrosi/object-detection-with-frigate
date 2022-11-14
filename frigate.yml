@@ -99,11 +99,13 @@ timestamp_style:
   thickness: 2
   effect: solid
   
+# Tells Frigate to use my Coral TPU.
 detectors:
   coral:
     type: edgetpu
     device: usb
 
+# I record all activity and save it for one day.
 record:
   enabled: true
   retain_days: 1
