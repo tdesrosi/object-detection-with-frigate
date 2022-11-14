@@ -1,0 +1,112 @@
+# Final Frigate Home Assistant Add-on configuration file.
+# Place this file at the root of your config directory.
+
+# MQTT is required for frigate. I use mosquitto for this.
+# Be sure to replace the user, and password with your parameters.
+# It's recommended to use secure evironment variables or a secret manager to store sensitive passwords.
+mqtt:
+  host: core-mosquitto
+  user: {YOUR-MQTT-USER}
+  password: {USER-MQTT-PASSWORD}
+  
+# Defines the "Hallway" camera and defines paths for recording, streaming, and detection.
+# Be sure to replace the IP address, user, and password with your parameters.
+# It's recommended to use secure evironment variables or a secret manager to store sensitive passwords.
+cameras: 
+  hallway:
+    ffmpeg:
+      input_args:
+        - -avoid_negative_ts
+        - make_zero
+        - -fflags
+        - nobuffer+genpts+discardcorrupt
+        - -flags
+        - low_delay
+        - -strict
+        - experimental
+        - -analyzeduration
+        - 1000M
+        - -probesize
+        - 1000M
+        - -rw_timeout
+        - "5000000"
+      inputs:
+        - path: http://{YOUR-IP-ADDRESS}/flv?port=1935&app=bcs&stream=channel0_main.bcs&user={user}&password={password}
+          roles:
+            - record
+            - rtmp
+        - path: http://{YOUR-IP-ADDRESS}/flv?port=1935&app=bcs&stream=channel0_ext.bcs&user={user}&password={password}
+          roles:
+            - detect
+    detect:
+      width: 640
+      height: 480
+      fps: 7
+
+# Creates a mask for person detection and sets min score for event triggering.
+objects:
+  track:
+    - person
+  mask: 0,0,1000,0,1000,200,0,200
+  filters:
+    person:
+      min_area: 5000
+      max_area: 100000
+      min_score: 0.5
+      threshold: 0.7
+      mask: 0,0,1000,0,1000,200,0,200
+
+# Args for FFMPEG process (leave as-is for Reolink RLC-520).            
+ffmpeg:
+  global_args: -hide_banner -loglevel warning
+  hwaccel_args: []
+  input_args: -avoid_negative_ts make_zero -fflags +genpts+discardcorrupt -rtsp_transport tcp -stimeout 5000000 -use_wallclock_as_timestamps 1
+  output_args:
+    detect: -f rawvideo -pix_fmt yuv420p
+    record: -f segment -segment_time 10 -segment_format mp4 -reset_timestamps 1 -strftime 1 -c:v copy -c:a aac
+    rtmp: -c copy -f flv
+
+# Sets params regarding detection area and timeframe.
+detect:
+  width: 1280
+  height: 720
+  fps: 5
+  enabled: True
+  max_disappeared: 25
+
+# Creates a mask for object detection to reduce processing overhead.
+motion:
+  threshold: 25
+  contour_area: 100
+  delta_alpha: 0.2
+  frame_alpha: 0.2
+  frame_height: 180
+  mask: 0,900,1080,900,1080,1920,0,1920
+
+# Sets the playback quality in Frigate UI.
+live:
+  height: 720
+  quality: 5
+
+# Sets the style of the embedded timestamp.
+timestamp_style:
+  position: "tl"
+  format: "%m/%d/%Y %H:%M:%S"
+  color:
+    red: 255
+    green: 255
+    blue: 255
+  thickness: 2
+  effect: solid
+  
+detectors:
+  coral:
+    type: edgetpu
+    device: usb
+
+record:
+  enabled: true
+  retain_days: 1
+  events:
+    retain:
+      default: 5
